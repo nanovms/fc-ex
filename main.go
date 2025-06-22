@@ -10,8 +10,6 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	firecracker "github.com/firecracker-microvm/firecracker-go-sdk"
-	models "github.com/firecracker-microvm/firecracker-go-sdk/client/models"
 	"io/ioutil"
 	"log"
 	"net"
@@ -20,9 +18,13 @@ import (
 	"os/exec"
 	"os/signal"
 	"syscall"
+
+	firecracker "github.com/firecracker-microvm/firecracker-go-sdk"
+	models "github.com/firecracker-microvm/firecracker-go-sdk/client/models"
 )
 
-var kpath = "/home/eyberg/.ops/0.1.54/kernel.img"
+var kpath = "/home/ubuntu/.ops/nightly/kernel.img"
+var fpath = "/home/ubuntu/firecracker/firecracker"
 
 type CreateRequest struct {
 	RootDrivePath string `json:"root_image_path"`
@@ -122,7 +124,7 @@ func getOptions(id byte, req CreateRequest) options {
 	bootArgs := "ro console=ttyS0 noapic reboot=k panic=1 pci=off nomodules random.trust_cpu=on "
 	bootArgs = bootArgs + fmt.Sprintf("ip=%s::%s:%s::eth0:off", fc_ip, gateway_ip, docker_mask_long)
 	return options{
-		FcBinary:        "/home/eyberg/fc/firecracker",
+		FcBinary:        fpath,
 		FcKernelImage:   kpath,
 		FcKernelCmdLine: bootArgs,
 		FcRootDrivePath: req.RootDrivePath,
@@ -164,10 +166,6 @@ func (opts *options) createVMM(ctx context.Context) (*RunningFirecracker, error)
 
 	if err := exec.Command("rm", "-f", opts.FcSocketPath).Run(); err != nil {
 		return nil, fmt.Errorf("Failed to delete old socket path: %s", err)
-	}
-
-	if err := exec.Command("brctl", "addif", "docker0", opts.TapDev).Run(); err != nil {
-		return nil, fmt.Errorf("Failed adding tap device to bridge: %s", err)
 	}
 
 	if err := exec.Command("ip", "link", "set", opts.TapDev, "up").Run(); err != nil {
